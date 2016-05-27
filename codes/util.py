@@ -1,5 +1,6 @@
 import numpy as np
 from tri_solve import *
+
 # returns Y = J times X, Y = list of matrices
 # N = list of matrices for layers
 # W = list of matrices for weights
@@ -85,7 +86,7 @@ def backsolve_i(R, S, lamb, b):
 # simple implementation of cg with preconditioning, specific to the case of solving
 # A = J^T J + lambda I
 # with preconditioner R such that R^T R approximates A
-def pcg_i(N, W, F, lamb, R, S, b, x0, tol = 1.0e-1, max_it = 500, is_p = True):    
+def pcg_i(N, W, F, lamb, R, S, b, x0, tol = 1.0e-1, max_it = 1000, is_p = True):    
     # initializations    
     x = x0
     #r0 = b - multiply_A_i(N, W, F, lamb, x)

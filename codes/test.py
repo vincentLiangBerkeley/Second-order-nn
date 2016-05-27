@@ -24,7 +24,7 @@ class TestFactorization(unittest.TestCase):
         u,s2,v = np.linalg.svd(J)
         self.assertTrue(np.max(abs(s-s2)) < self.EPS)
 
-    def test_rectangal(self):
+    def test_rectangle(self):
         NN = [np.random.randn(self.dx,self.dk) for i in range(self.l)]
         A = [np.random.randn(self.dk,3), np.random.randn(self.dk,4)]
 
@@ -147,27 +147,15 @@ class TestMultiply(unittest.TestCase):
     def test_conversion(self):
         test = mat_to_vec([self.X_1, self.X_2])
         mat = vec_to_mat(test, [self.X_1.shape, self.X_2.shape])
-        self.assertTrue(np.max(abs(mat[0] - X_1)) < 1e-16)
-
+        self.assertTrue(np.max(abs(mat[0] - X_1)) < 1e-16) 
+    
 class TestPCG(unittest.TestCase):
     """Testing PCG with implicit multiplication methods."""
     def setUp(self):
         # testing of PCG
-        l = 3
-        self.dk = np.array([32,16, 8])
-        dx = np.sum(self.dk)
-
+        self.dk = np.array([32,16,8])
+        self.N, self.W, self.F, self.NN_id, self.A_id, self.R_id, self.SS_id, self.NN_rk1, self.A_rk1, self.R_rk1, self.SS_rk1, self.x, self.b = construct_2layer_nn(self.dk, [sigmoid, tanh], [sigmoid_gradient, tanh_gradient])
         # generate weights 
-        N_0 = np.random.randn(self.dk[0], dx)
-        self.W_1 = np.random.randn(self.dk[1], self.dk[0])
-        self.W_2 = np.random.randn(self.dk[2], self.dk[1])
-        self.W = [self.W_1, self.W_2]
-        self.F = [sigmoid_gradient, tanh_gradient]
-        F_forward = [sigmoid, tanh]
-        self.N = forward_params(self.W, N_0, F_forward)
-        m = self.W_1.shape[0]*self.W_1.shape[1] + self.W_2.shape[0]*self.W_2.shape[1]
-        self.b = np.random.randn(m,1)
-        self.x = np.zeros((m,1))
         self.lambs = [0.01, 0.1, 1]
 
     def run_pcg(self, lamb, R, SS):
@@ -181,83 +169,24 @@ class TestPCG(unittest.TestCase):
         print('with no preconditioning, iterations = %d, running time = %s'%(i2, end))
 
     def test_pcg(self):
-        NN = [n.T for n in self.N][:-1]
-        A = [self.W_2, np.eye(self.dk[-1])]
-        R,S = QR_of_J(NN,A)
-        SS = append_zero_rows(S)
-
         for lamb in self.lambs:
             print("\nTesting PCG with identity activation lamb = %.2f"%lamb)
-            self.run_pcg(lamb, R, SS)
+            self.run_pcg(lamb, self.R_id, self.SS_id)
 
     def test_pcg_rk1(self):
-        F1 = self.F[0](np.dot(self.W_1, self.N[0]))
-        u1,S,v1 = np.linalg.svd(F1)
-        g1 = u1[:,0]
-        h1 = v1[:,0]
-
-        F2 = self.F[1](np.dot(self.W_2, self.N[1]))
-        u2,S,v2 = np.linalg.svd(F2)
-        g2 = u2[:,0]
-        h2 = v2[:,0]
-
-        NN_0 = np.dot(np.diag(np.multiply(h1,h2)), self.N[0].T)
-        NN_1 = np.dot(np.diag(h2), self.N[1].T)
-        A_0 = np.dot(np.diag(g2), np.dot(self.W_2, np.diag(g1)))
-        A_1 = np.diag(g2)
-        NN_rk1 = [NN_0, NN_1]
-        A_rk1 = [A_0, A_1]
-
-        R_rk1,S_rk1 = QR_of_J(NN_rk1,A_rk1)
-        SS_rk1 = append_zero_rows(S_rk1)
-
         for lamb in self.lambs:
             print("\nTesting PCG with rank-one approximation lamb = %.2f"%lamb)
-            self.run_pcg(lamb, R_rk1, SS_rk1)
+            self.run_pcg(lamb, self.R_rk1, self.SS_rk1)
 
 class TestApproximation(unittest.TestCase):
     """Testing the approximation effectiveness of Qr and thresholding"""
     def setUp(self):
         lamb = 0.01
-        l = 3
         dk = np.array([32,16, 8])
-        dx = np.sum(dk)
-
-        # generate weights 
-        N_0 = np.random.randn(dk[0], dx)
-        W_1 = np.random.randn(dk[1], dk[0])
-        W_2 = np.random.randn(dk[2], dk[1])
-        W = [W_1, W_2]
-        F = [sigmoid_gradient, tanh_gradient]
-        F_forward = [sigmoid, tanh]
-        N = forward_params(W, N_0, F_forward)
+        N, W, F, NN_id, A_id, self.R, self.SS, NN_rk1, A_rk1, self.R_rk1, self.SS_rk1, x0, b = \
+                construct_2layer_nn(dk)
+        
         self.Jtr_full = util.form_Jtr(N, W, F)
-
-        NN = [n.T for n in N][:-1]
-        A_0 = [W_2, np.eye(dk[-1])]
-        self.R,S = QR_of_J(NN,A_0)
-        self.SS = append_zero_rows(S)
-
-        F1 = F[0](np.dot(W_1, N[0]))
-        u1,S,v1 = np.linalg.svd(F1)
-        g1 = u1[:,0]
-        h1 = v1[:,0]
-
-        F2 = F[1](np.dot(W_2, N[1]))
-        u2,S,v2 = np.linalg.svd(F2)
-        g2 = u2[:,0]
-        h2 = v2[:,0]
-
-        NN_0 = np.dot(np.diag(np.multiply(h1,h2)), N[0].T)
-        NN_1 = np.dot(np.diag(h2), N[1].T)
-        A_0 = np.dot(np.diag(g2), np.dot(W_2, np.diag(g1)))
-        A_1 = np.diag(g2)
-        NN_rk1 = [NN_0, NN_1]
-        A_rk1 = [A_0, A_1]
-
-        self.R_rk1,S_rk1 = QR_of_J(NN_rk1,A_rk1)
-        self.SS_rk1 = append_zero_rows(S_rk1)
-
 
         A = np.dot(self.Jtr_full, self.Jtr_full.T) + lamb*np.eye(self.Jtr_full.shape[0])
 
